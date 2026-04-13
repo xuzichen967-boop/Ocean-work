@@ -336,24 +336,14 @@ export default function Generator() {
               className="w-full h-28 bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-4 text-sm text-on-surface focus:ring-2 focus:ring-tertiary focus:border-transparent outline-none transition-all resize-none"
               placeholder="Describe a brick build, for example futuristic owl tower"
             />
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleGenerate('create')}
-                disabled={isGenerating}
-                className="stud-button py-3 bg-primary text-on-primary rounded-xl font-headline font-bold flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isGenerating && promptMode === 'create' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                New Build
-              </button>
-              <button
-                onClick={() => handleGenerate('morph')}
-                disabled={isGenerating || appState !== AppState.DISMANTLING}
-                className="stud-button py-3 bg-secondary-container text-on-secondary-container rounded-xl font-headline font-bold flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isGenerating && promptMode === 'morph' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                Rebuild AI
-              </button>
-            </div>
+            <button
+              onClick={() => handleGenerate('create')}
+              disabled={isGenerating}
+              className="stud-button w-full py-4 bg-primary text-on-primary rounded-xl font-headline font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-primary/20 disabled:opacity-50 transition-all"
+            >
+              {isGenerating && promptMode === 'create' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+              Generate New Build
+            </button>
           </div>
 
           <div className="space-y-3">
@@ -544,6 +534,14 @@ export default function Generator() {
           >
             <Hammer className="w-4 h-4" />
             Break
+          </button>
+          <button
+            onClick={() => rebuildModel(currentBaseModel, currentModelData)}
+            disabled={!canRebuild}
+            className="stud-button px-5 py-3 rounded-xl bg-secondary text-on-secondary font-headline font-bold flex items-center gap-2 disabled:opacity-50"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Rebuild
           </button>
         </div>
       </div>
