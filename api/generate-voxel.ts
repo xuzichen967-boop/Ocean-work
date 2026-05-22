@@ -71,8 +71,8 @@ interface ManufacturabilityReport {
   notes: string[];
 }
 
-const DEFAULT_TIMEOUT_MS = 28_000;
-const DEFAULT_MODEL_CHAIN = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_MODEL_CHAIN = ['gemini-2.5-flash-lite'];
 
 export const config = {
   api: {
