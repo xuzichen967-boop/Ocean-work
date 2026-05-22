@@ -73,6 +73,7 @@ interface ManufacturabilityReport {
 
 const DEFAULT_TIMEOUT_MS = 40_000;
 const DEFAULT_MODEL_CHAIN = ['gemini-2.5-flash-lite'];
+const DEFAULT_MODEL_ATTEMPTS = 2;
 
 export const config = {
   api: {
@@ -113,11 +114,11 @@ function buildSystemPrompt(mode: GenerateMode, prompt: string, paletteHint: stri
 Infer depth and volume so it becomes a true 3D sculpture, not a flat plane.
 Return only a JSON array of voxels.
 Each voxel must include x, y, z (integers) and color (hex string).
-Keep voxel count roughly between 700 and 1400 when the subject needs detail, and use fewer only for very simple objects.
+Keep voxel count compact, usually between 140 and 260 voxels, and only exceed that when absolutely necessary.
 The model should be centered around (0, 0, 0).
 Favor broad rectangular patches that can be converted into 1x2, 1x3, 1x4, 2x2, 2x3, 2x4, 2x6, and 2x8 Lego-like bricks.
 Add recognizable supported details such as eyes, beaks, ears, paws, wings, clothing folds, surface markings, or texture bands when relevant.
-Aim for a Lego set style: mostly medium and large structural regions with small bricks reserved for important identity details.
+Aim for a coarse but recognizable Lego set style: broad readable masses first, a few small detail accents second.
 Use staggered, interlocking layers rather than perfectly aligned seams.`;
   }
 
@@ -126,10 +127,10 @@ Return only a JSON array.
 Each item must include x, y, z, color where color is a hex string like #ff0000.
 Keep the model compact and suitable for a tabletop toy sculpture.
 Prefer connected structures with stable support and avoid floating disconnected pieces.
-Use enough voxels to make the subject recognizable and lively, usually 700 to 1400 voxels for animals or characters.
-Avoid both tiny under-detailed builds and overly huge builds that become hard to view or manipulate.
+Use a compact coarse voxel draft, usually 120 to 260 voxels for animals or characters.
+Avoid overly detailed or very large outputs; favor a fast, readable base sculpture.
 Favor broad rectangular interior patches that can be converted into 1x3, 1x4, 2x2, 2x3, 2x4, 2x6, and 2x8 bricks, but preserve silhouettes, color boundaries, faces, claws, wings, and other important details with smaller supported regions.
-Aim for a Lego set style: mostly medium and large structural regions with small bricks reserved for important identity details.
+Aim for a coarse but recognizable Lego set style: broad readable masses first, a few small detail accents second.
 Use staggered, interlocking layers rather than perfectly aligned seams.`;
 }
 
@@ -140,6 +141,11 @@ function getModelChain() {
     .map((model) => model.trim())
     .filter(Boolean);
   return models.length ? models : DEFAULT_MODEL_CHAIN;
+}
+
+function getModelAttempts() {
+  const configured = Number.parseInt(process.env.GEMINI_MODEL_ATTEMPTS || '', 10);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MODEL_ATTEMPTS;
 }
 
 function getLocalPresetFromPrompt(value: string): 'Fox' | 'Tiger' | null {
@@ -1397,24 +1403,32 @@ export default async function handler(req: any, res: any) {
     let lastModelError: any = null;
 
     for (const model of getModelChain()) {
-      try {
-        response = await Promise.race([
-          ai.models.generateContent({
-            model,
-            contents,
-            config: modelConfig,
-          }),
-          new Promise((_, reject) => {
-            setTimeout(() => reject(new Error(`Model generation timeout after ${timeoutMs}ms on ${model}`)), timeoutMs);
-          }),
-        ]) as any;
-        break;
-      } catch (error: any) {
-        lastModelError = error;
-        console.warn(`Gemini model ${model} failed:`, error?.message || error);
-        if (!isRetryableModelError(error)) {
-          throw error;
+      for (let attempt = 1; attempt <= getModelAttempts(); attempt++) {
+        try {
+          response = await Promise.race([
+            ai.models.generateContent({
+              model,
+              contents,
+              config: modelConfig,
+            }),
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error(`Model generation timeout after ${timeoutMs}ms on ${model}`)), timeoutMs);
+            }),
+          ]) as any;
+          break;
+        } catch (error: any) {
+          lastModelError = error;
+          console.warn(`Gemini model ${model} attempt ${attempt} failed:`, error?.message || error);
+          if (!isRetryableModelError(error) || attempt >= getModelAttempts()) {
+            if (!isRetryableModelError(error)) {
+              throw error;
+            }
+            continue;
+          }
         }
+      }
+      if (response) {
+        break;
       }
     }
 
