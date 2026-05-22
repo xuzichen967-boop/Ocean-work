@@ -345,18 +345,34 @@ function addRailBricks(
   y: number,
   color: number,
   idPrefix: string,
-  startOffset: number
+  startOffset: number,
+  occupied?: Set<string>
 ) {
   for (let i = startOffset; i < path.length; i += 4) {
     const slice = path.slice(i, Math.min(i + 4, path.length));
-    if (!slice.length) {
+    const available = slice.filter((cell) => !occupied?.has(cellKey(cell.x, y, cell.z)));
+    if (!available.length) {
       continue;
     }
-    additions.push(lineBrickFromPathCells(
-      `${idPrefix}-rail-${y}-${i}`,
-      slice.map((cell) => ({ x: cell.x, y, z: cell.z })),
-      color
-    ));
+    const runs: Array<Array<{ x: number; z: number }>> = [];
+    available.forEach((cell) => {
+      const lastRun = runs[runs.length - 1];
+      const previous = lastRun?.[lastRun.length - 1];
+      const contiguous = previous && Math.abs(previous.x - cell.x) + Math.abs(previous.z - cell.z) === 1;
+      if (!lastRun || !contiguous) {
+        runs.push([cell]);
+      } else {
+        lastRun.push(cell);
+      }
+    });
+    runs.forEach((run, runIndex) => {
+      run.forEach((cell) => occupied?.add(cellKey(cell.x, y, cell.z)));
+      additions.push(lineBrickFromPathCells(
+        `${idPrefix}-rail-${y}-${i}-${runIndex}`,
+        run.map((cell) => ({ x: cell.x, y, z: cell.z })),
+        color
+      ));
+    });
   }
 }
 
@@ -405,8 +421,16 @@ export function createStudBridgeScaffoldBricks(bricks: ConstraintBrick[]): Const
       }
     });
 
-    addRailBricks(additions, path, globalTopY, color, idPrefix, 0);
-    addRailBricks(additions, path, globalTopY + 1, color, `${idPrefix}-tie`, Math.min(2, Math.max(0, path.length - 1)));
+    addRailBricks(additions, path, globalTopY, color, idPrefix, 0, occupied);
+    addRailBricks(
+      additions,
+      path,
+      globalTopY + 1,
+      color,
+      `${idPrefix}-tie`,
+      Math.min(2, Math.max(0, path.length - 1)),
+      occupied
+    );
     main.push(...components[componentIndex]);
   }
 

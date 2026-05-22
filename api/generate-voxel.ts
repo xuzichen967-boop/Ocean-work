@@ -1136,18 +1136,19 @@ function validateManufacturability(
   connectionValidation: ConnectionValidation
 ): ManufacturabilityReport {
   const notes: string[] = [];
+  const brickCells = bricks.flatMap((brick) => brick.cells);
 
   // LEGO-like lattice assumptions:
   // - 1 grid step in x/z == 1 stud pitch
   // - 1 grid step in y   == 1 brick layer
   // So integer coordinates are required.
-  const gridAligned = voxels.every((v) => Number.isInteger(v.x) && Number.isInteger(v.y) && Number.isInteger(v.z));
+  const gridAligned = brickCells.every((v) => Number.isInteger(v.x) && Number.isInteger(v.y) && Number.isInteger(v.z));
   if (!gridAligned) {
     notes.push('Non-integer grid coordinates found.');
   }
 
   // No overlap check.
-  const voxelKeys = voxels.map((v) => cellKey(v.x, v.y, v.z));
+  const voxelKeys = brickCells.map((v) => cellKey(v.x, v.y, v.z));
   const noOverlap = new Set(voxelKeys).size === voxelKeys.length;
   if (!noOverlap) {
     notes.push('Overlapping voxel occupancy detected.');
@@ -1178,14 +1179,8 @@ function validateManufacturability(
     notes.push('Detected non-lattice seam alignment.');
   }
 
-  // Voxel-level support check.
-  let unsupportedVoxels = 0;
-  for (const v of voxels) {
-    if (v.y === 0) continue;
-    if (!occupied.has(cellKey(v.x, v.y - 1, v.z))) {
-      unsupportedVoxels++;
-    }
-  }
+  // Assembly support is brick-level: legal cantilevers may contain cells without a voxel directly below.
+  const unsupportedVoxels = connectionValidation.unsupportedBrickIds.length;
   if (unsupportedVoxels > 0) {
     notes.push(`Unsupported voxels: ${unsupportedVoxels}`);
   }
